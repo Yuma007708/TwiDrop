@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twidrop"
+version = "0.1.0"
+description = "ツイートの本文・画像・動画をローカルに保存するツール"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "httpx>=0.26",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+twidrop = "twidrop.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["twidrop*"]
+
+[tool.setuptools.package-data]
+twidrop = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
