@@ -49,6 +49,7 @@ targets:
       # 保存先の決め方と配色を本体アプリと共有する。
       - path: TwiDrop/ArchiveLocation.swift
       - path: TwiDrop/Theme.swift
+      - path: TwiDrop/PhotoLibrarySaver.swift
     dependencies:
       - package: TwiDropKit
     settings:

@@ -1,32 +1,28 @@
 import SwiftUI
 import TwiDropKit
 
-/// 「保存」タブ。URL を貼ると自動でプレビューし、ボタン 1 つで保存する。
+/// 唯一の画面。URL を貼ると自動でプレビューし、ボタン 1 つで写真アプリに保存する。
 struct SaveView: View {
     @EnvironmentObject private var viewModel: TweetViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @FocusState private var urlFieldFocused: Bool
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 header
-                if viewModel.clipboardHasContent, viewModel.urlText.isEmpty {
-                    clipboardChip
-                }
-                previewArea
+                content
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, minHeight: contentMinHeight, alignment: .top)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Theme.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) { dock }
-        .onAppear {
-            viewModel.refreshClipboardHint()
-            viewModel.refreshSaved()
-        }
+        .onAppear { viewModel.refreshClipboardHint() }
         .onChange(of: scenePhase) {
             if scenePhase == .active { viewModel.refreshClipboardHint() }
         }
@@ -35,35 +31,45 @@ struct SaveView: View {
         }
     }
 
+    /// 空の状態で案内を画面中央に置くための高さ。
+    private var contentMinHeight: CGFloat {
+        if case .idle = viewModel.phase { return 420 }
+        return 0
+    }
+
     // MARK: - 上部
 
     private var header: some View {
         HStack(spacing: 8) {
             Circle().fill(Theme.accent).frame(width: 10, height: 10)
             Text("TwiDrop")
-                .font(.title2.weight(.heavy))
+                .font(.title2.weight(.black))
                 .foregroundStyle(Theme.text)
+            Spacer()
+            if viewModel.clipboardHasContent, viewModel.urlText.isEmpty {
+                clipboardChip
+            }
         }
         .frame(height: 44)
+        .padding(.horizontal, 4)
     }
 
     private var clipboardChip: some View {
         Button {
             viewModel.useClipboard()
         } label: {
-            Label("クリップボードの URL を使う", systemImage: "doc.on.clipboard")
-                .font(.subheadline.weight(.semibold))
+            Label("クリップボードから", systemImage: "doc.on.clipboard")
+                .font(.caption.weight(.heavy))
                 .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 14)
-                .frame(height: 40)
-                .background(Theme.accent.opacity(0.08), in: Capsule())
-                .overlay(Capsule().stroke(Theme.accent.opacity(0.45), lineWidth: 1))
+                .padding(.horizontal, 12)
+                .frame(height: 34)
+                .overlay(Capsule().stroke(Theme.accent, lineWidth: 1.5))
         }
         .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private var previewArea: some View {
+    private var content: some View {
         switch viewModel.phase {
         case .idle:
             emptyState
@@ -72,32 +78,24 @@ struct SaveView: View {
             VStack(spacing: 12) {
                 ProgressView().tint(Theme.accent)
                 Text("ツイートを取得しています…")
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.muted)
             }
             .frame(maxWidth: .infinity, minHeight: 220)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cornerLarge, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cornerCard, style: .continuous))
 
         case .loaded(let tweet):
-            VStack(alignment: .leading, spacing: 10) {
-                TweetCardView(tweet: tweet)
-                if let status = viewModel.statusMessage {
-                    Label(status, systemImage: "checkmark.circle.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 4)
-                } else if viewModel.isPreviewSaved {
-                    Label("保存済み", systemImage: "checkmark.circle")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.muted)
-                        .padding(.horizontal, 4)
-                }
+            TweetCardView(tweet: tweet, isSaved: viewModel.isPreviewSaved) {
+                viewModel.copyText()
+            }
+            if let outcome = viewModel.outcome, outcome.tweetID == tweet.id {
+                outcomeBanner(outcome, tweet: tweet)
             }
 
         case .failed(let message):
             VStack(alignment: .leading, spacing: 8) {
                 Label("取得できませんでした", systemImage: "exclamationmark.triangle.fill")
-                    .font(.subheadline.weight(.bold))
+                    .font(.subheadline.weight(.heavy))
                     .foregroundStyle(Theme.danger)
                 Text(message)
                     .font(.footnote)
@@ -105,60 +103,107 @@ struct SaveView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cornerLarge, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cornerCard, style: .continuous))
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "link")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(Theme.faint)
-            Text("ツイートの URL を貼り付けると\nここにプレビューが出ます")
+        VStack(spacing: 14) {
+            Circle()
+                .fill(Theme.tint)
+                .frame(width: 84, height: 84)
+                .overlay(
+                    Image(systemName: "link")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(Theme.accent)
+                )
+            Text("ツイートの URL を貼り付け")
+                .font(.title3.weight(.black))
+                .foregroundStyle(Theme.text)
+            Text("貼り付けるとすぐにプレビューが出ます。\n動画と画像は写真アプリに保存されます。")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Theme.muted)
-            Text("X アプリの共有シートからも保存できます")
-                .font(.caption)
-                .foregroundStyle(Theme.faint)
+            Label("X アプリの共有シートからも保存できます", systemImage: "square.and.arrow.up")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.muted)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.tint, lineWidth: 1.5))
+                .padding(.top, 6)
         }
-        .frame(maxWidth: .infinity, minHeight: 240)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerLarge, style: .continuous)
-                .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [6, 6]))
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 16)
+    }
+
+    private func outcomeBanner(_ outcome: TweetViewModel.SaveOutcome, tweet: Tweet) -> some View {
+        let message: String
+        if outcome.addedToPhotos > 0 {
+            let kind = tweet.hasVideo ? "動画" : "画像"
+            message = "写真アプリに\(kind) \(outcome.addedToPhotos) 件を追加しました"
+        } else {
+            message = "本文を保存しました（メディアなし）"
+        }
+        return HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.body.weight(.bold))
+            Text(message)
+                .font(.footnote.weight(.heavy))
+            if outcome.skipped > 0 {
+                Text("· \(outcome.skipped) 件は取得できず")
+                    .font(.footnote.weight(.semibold))
+            }
+        }
+        .foregroundStyle(Theme.accent)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Theme.tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - 下部の操作エリア
 
+    @ViewBuilder
     private var dock: some View {
         VStack(spacing: 10) {
-            urlField
+            if viewModel.isPreviewSaved {
+                Button {
+                    openURL(PhotoLibrarySaver.photosAppURL)
+                } label: {
+                    Label("写真アプリで見る", systemImage: "photo.on.rectangle")
+                }
+                .buttonStyle(PrimaryButtonStyle())
 
-            Button {
-                urlFieldFocused = false
-                Task { await viewModel.save() }
-            } label: {
-                if viewModel.isSaving {
-                    ProgressView().tint(Theme.onAccent)
-                } else {
-                    Label("保存する", systemImage: "arrow.down.to.line")
+                Button {
+                    viewModel.reset()
+                } label: {
+                    Label("別の URL を保存", systemImage: "plus")
+                }
+                .buttonStyle(SecondaryButtonStyle())
+            } else {
+                urlField
+
+                Button {
+                    urlFieldFocused = false
+                    Task { await viewModel.save() }
+                } label: {
+                    if viewModel.isSaving {
+                        ProgressView().tint(Theme.onAccent)
+                    } else {
+                        Label("写真アプリに保存", systemImage: "arrow.down.to.line")
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(!viewModel.canSubmit)
+                .opacity(viewModel.canSubmit ? 1 : 0.4)
+
+                if viewModel.previewedTweet != nil {
+                    Label("動画と画像は写真アプリに入ります", systemImage: "photo")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
                 }
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(!viewModel.canSubmit)
-            .opacity(viewModel.canSubmit ? 1 : 0.5)
-
-            Toggle(isOn: $viewModel.saveToPhotos) {
-                Text("写真アプリにも保存")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .tint(Theme.accent)
-            .fixedSize()
-            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -170,7 +215,7 @@ struct SaveView: View {
         HStack(spacing: 10) {
             Image(systemName: "link")
                 .foregroundStyle(Theme.muted)
-            TextField("ツイートの URL を貼り付け", text: $viewModel.urlText)
+            TextField("https://x.com/…/status/…", text: $viewModel.urlText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
@@ -183,24 +228,21 @@ struct SaveView: View {
                 }
             if !viewModel.urlText.isEmpty {
                 Button {
-                    viewModel.clearURL()
+                    viewModel.reset()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.muted)
-                        .frame(width: 20, height: 20)
-                        .background(Theme.surfaceRaised, in: Circle())
+                        .frame(width: 22, height: 22)
+                        .background(Theme.tint, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("URL を消去")
             }
         }
-        .padding(.horizontal, 16)
-        .frame(height: 50)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(urlFieldFocused ? Theme.accent.opacity(0.6) : Theme.hairline, lineWidth: 1)
-        )
+        .padding(.horizontal, 18)
+        .frame(height: 54)
+        .background(Theme.surface, in: Capsule())
+        .overlay(Capsule().stroke(urlFieldFocused ? Theme.accent : Theme.tint, lineWidth: 1.5))
     }
 }

@@ -14,14 +14,19 @@ final class TweetViewModel: ObservableObject {
         case failed(String)
     }
 
+    /// 保存の結果。写真アプリへ何件入ったかを覚えておく。
+    struct SaveOutcome: Equatable {
+        let tweetID: String
+        let addedToPhotos: Int
+        let skipped: Int
+    }
+
     @Published var urlText = ""
-    @Published var saveToPhotos = true
     @Published private(set) var phase: Phase = .idle
-    @Published private(set) var savedTweets: [SavedTweet] = []
     @Published private(set) var isSaving = false
+    @Published private(set) var outcome: SaveOutcome?
     /// クリップボードに何か入っているか（中身は読まない。読むのはユーザーが押したとき）。
     @Published private(set) var clipboardHasContent = false
-    @Published var statusMessage: String?
     @Published var errorMessage: String?
 
     private let client: SyndicationClient
@@ -48,10 +53,10 @@ final class TweetViewModel: ObservableObject {
         !urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSaving
     }
 
-    /// 表示中のツイートが保存済みか。
+    /// 表示中のツイートを今回保存し終えたか。
     var isPreviewSaved: Bool {
-        guard let tweet = previewedTweet else { return false }
-        return archive.isSaved(tweet)
+        guard let tweet = previewedTweet, let outcome else { return false }
+        return outcome.tweetID == tweet.id
     }
 
     // MARK: - 入力
@@ -60,15 +65,16 @@ final class TweetViewModel: ObservableObject {
     func urlTextChanged() {
         previewTask?.cancel()
         let source = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
-        statusMessage = nil
 
         guard !source.isEmpty else {
             phase = .idle
             loadedSource = nil
+            outcome = nil
             return
         }
         guard TweetURL.firstID(inText: source) != nil, source != loadedSource else { return }
 
+        outcome = nil
         previewTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(450))
             guard !Task.isCancelled else { return }
@@ -76,9 +82,14 @@ final class TweetViewModel: ObservableObject {
         }
     }
 
-    func clearURL() {
+    /// 入力を空に戻して最初の状態にする。
+    func reset() {
+        previewTask?.cancel()
         urlText = ""
-        urlTextChanged()
+        phase = .idle
+        loadedSource = nil
+        outcome = nil
+        refreshClipboardHint()
     }
 
     /// クリップボードに何かあるかだけを確かめる（貼り付けの許可ダイアログは出ない）。
@@ -98,7 +109,14 @@ final class TweetViewModel: ObservableObject {
         }
         urlText = TweetURL.canonicalURL(id: id, screenName: nil)?.absoluteString ?? id
         previewTask?.cancel()
+        outcome = nil
         Task { await loadPreview() }
+    }
+
+    /// 本文をクリップボードにコピーする。
+    func copyText() {
+        guard let tweet = previewedTweet else { return }
+        UIPasteboard.general.string = tweet.text
     }
 
     // MARK: - 取得と保存
@@ -122,7 +140,7 @@ final class TweetViewModel: ObservableObject {
         }
     }
 
-    /// 取得済みのツイートを端末に保存する。未取得なら先に取得する。
+    /// 取得済みのツイートを保存し、動画・画像を写真アプリに追加する。未取得なら先に取得する。
     func save() async {
         previewTask?.cancel()
         let tweet: Tweet
@@ -139,38 +157,12 @@ final class TweetViewModel: ObservableObject {
 
         do {
             let saved = try await archive.save(tweet)
-            var parts = ["保存しました"]
-            if !saved.mediaFiles.isEmpty {
-                parts.append("メディア \(saved.mediaFiles.count) 件")
-            }
-            if saveToPhotos, !saved.mediaFiles.isEmpty {
-                let added = try await PhotoLibrarySaver.addToPhotoLibrary(saved)
-                parts.append("写真アプリに \(added) 件追加")
-            }
-            if !saved.skipped.isEmpty {
-                parts.append("\(saved.skipped.count) 件は取得できませんでした")
-            }
-            statusMessage = parts.joined(separator: " · ")
-            refreshSaved()
+            let added = try await PhotoLibrarySaver.addToPhotoLibrary(saved)
+            // 写真アプリに入ったら端末内のコピーは不要。本文（tweet.md / tweet.json）は残す。
+            PhotoLibrarySaver.removeLocalMedia(of: saved)
+            outcome = SaveOutcome(tweetID: tweet.id, addedToPhotos: added, skipped: saved.skipped.count)
         } catch {
             errorMessage = message(for: error)
-        }
-    }
-
-    // MARK: - ライブラリ
-
-    /// 保存済み一覧を読み直す。
-    func refreshSaved() {
-        savedTweets = archive.saved()
-    }
-
-    /// 保存済みツイートを削除する。
-    func delete(_ saved: SavedTweet) {
-        do {
-            try archive.delete(saved)
-            refreshSaved()
-        } catch {
-            errorMessage = "削除に失敗しました: \(error.localizedDescription)"
         }
     }
 
@@ -178,6 +170,7 @@ final class TweetViewModel: ObservableObject {
     func handleIncoming(url: URL) async {
         urlText = url.absoluteString
         previewTask?.cancel()
+        outcome = nil
         await loadPreview()
     }
 

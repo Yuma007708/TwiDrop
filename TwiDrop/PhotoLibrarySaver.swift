@@ -15,6 +15,9 @@ enum PhotoLibrarySaver {
         }
     }
 
+    /// 写真アプリを開く URL。
+    static let photosAppURL = URL(string: "photos-redirect://")!
+
     /// 追加のみの権限を要求する。
     static func requestAuthorization() async -> Bool {
         let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
@@ -24,6 +27,7 @@ enum PhotoLibrarySaver {
     }
 
     /// 保存済みツイートのメディアをまとめて写真アプリに追加し、追加できた件数を返す。
+    /// メディアが無いツイート（テキストのみ）は 0 を返す。
     @discardableResult
     static func addToPhotoLibrary(_ saved: SavedTweet) async throws -> Int {
         guard !saved.mediaFiles.isEmpty else { return 0 }
@@ -35,6 +39,13 @@ enum PhotoLibrarySaver {
             added += 1
         }
         return added
+    }
+
+    /// 写真アプリに入った後の端末内コピーを消す。本文ファイルは残す。
+    static func removeLocalMedia(of saved: SavedTweet) {
+        for file in saved.mediaFiles {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 
     private static func add(file: URL, isVideo: Bool) async throws {
