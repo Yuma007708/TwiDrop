@@ -5,13 +5,20 @@ API キーや X アカウントのログインは不要です（埋め込みツ�
 
 ## できること
 
-- URL を貼り付けて**プレビュー**（本文・作者・動画はその場で再生）
+- URL を貼り付けると**自動でプレビュー**（本文・作者・動画はその場で再生）。ボタンは「保存する」1 つだけ
+- **クリップボードの URL をワンタップで使う**（中身はタップするまで読みません）
 - **端末に保存** — `tweet.json` / `tweet.md` と、動画・画像のファイル
 - **写真アプリに追加** — 保存した動画・画像をカメラロールへ
 - **共有シートから保存** — X アプリで「共有 → TwiDrop に保存」
-- **保存済み一覧** — 詳細表示、共有シートで書き出し、スワイプで削除
+- **ライブラリ** — 保存済みをサムネイルのグリッドで一覧。詳細から共有・写真に追加・削除
 
 動画は自動で**最高画質の mp4** を、画像は**原寸**を選びます。
+
+## デザイン
+
+ダーク × アンバーの 1 アクセント。動画が主役なので暗い背景でサムネイルを際立たせ、
+入力欄と保存ボタンは親指の届く画面下部に置いています。書体は SF Rounded（`fontDesign(.rounded)`）。
+配色と共通部品は `TwiDrop/Theme.swift` にまとめてあります。
 
 ## ビルド手順
 
@@ -39,7 +46,7 @@ App Group は共有拡張で保存したツイートを本体アプリから見�
 > XcodeGen を使わない場合は、Xcode で App + Share Extension のターゲットを作り、
 > `TwiDropKit` をローカルパッケージとして追加したうえで、
 > `TwiDrop/` と `ShareExtension/` のファイルを各ターゲットに入れてください。
-> `ArchiveLocation.swift` は**両方**のターゲットに含めます。
+> `ArchiveLocation.swift` と `Theme.swift` は**両方**のターゲットに含めます。
 
 ## 構成
 
@@ -52,9 +59,14 @@ App Group は共有拡張で保存したツイートを本体アプリから見�
 ├── TwiDrop/               # アプリ本体（SwiftUI）
 │   ├── TwiDropApp.swift
 │   ├── TweetViewModel.swift
-│   ├── ArchiveLocation.swift    # 共有拡張とも共有
+│   ├── Theme.swift              # 配色・共通部品（共有拡張とも共有）
+│   ├── ArchiveLocation.swift    # 保存先（共有拡張とも共有）
 │   ├── PhotoLibrarySaver.swift
 │   └── Views/
+│       ├── ContentView.swift        # 2 タブのルート
+│       ├── SaveView.swift           # 「保存」タブ
+│       ├── TweetCardView.swift      # ツイートカード・メディア表示
+│       └── SavedTweetsView.swift    # 「ライブラリ」タブ・詳細
 └── ShareExtension/        # 共有シート拡張
 ```
 

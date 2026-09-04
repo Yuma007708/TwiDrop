@@ -2,79 +2,86 @@ import AVKit
 import SwiftUI
 import TwiDropKit
 
-/// ツイート 1 件の見た目（作者・本文・添付メディア）。
+/// ツイート 1 件のカード。メディアを上に大きく、本文を下に。
 struct TweetCardView: View {
     let tweet: Tweet
+    /// 保存済みならローカルのファイル（`tweet.media` と同じ順）。無ければ配信元から再生する。
+    var localMedia: [URL] = []
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-
-            if !tweet.text.isEmpty {
-                Text(tweet.text)
-                    .font(.body)
-                    .textSelection(.enabled)
+        VStack(spacing: 0) {
+            ForEach(Array(tweet.media.enumerated()), id: \.element.id) { index, media in
+                MediaView(media: media, localURL: localMedia[safe: index])
             }
 
-            ForEach(tweet.media) { media in
-                MediaPreview(media: media)
+            VStack(alignment: .leading, spacing: 12) {
+                authorRow
+                if !tweet.text.isEmpty {
+                    Text(tweet.text)
+                        .font(.body)
+                        .lineSpacing(4)
+                        .foregroundStyle(Theme.text)
+                        .textSelection(.enabled)
+                }
+                metaRow
             }
-
-            metadata
+            .padding(16)
         }
-        .padding(.vertical, 4)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerLarge, style: .continuous))
     }
 
-    private var header: some View {
+    private var authorRow: some View {
         HStack(spacing: 10) {
-            AsyncImage(url: tweet.authorAvatarURL) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                Circle().fill(.quaternary)
-            }
-            .frame(width: 40, height: 40)
-            .clipShape(Circle())
-
+            AvatarView(name: tweet.authorName, url: tweet.authorAvatarURL)
             VStack(alignment: .leading, spacing: 1) {
-                Text(tweet.authorName).font(.subheadline.bold())
-                Text("@\(tweet.authorScreenName)")
+                Text(tweet.authorName)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Theme.text)
+                Text(handleAndDate)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
-
             Spacer()
-
             if let url = tweet.url {
                 Link(destination: url) {
                     Image(systemName: "arrow.up.right.square")
+                        .foregroundStyle(Theme.muted)
                 }
                 .accessibilityLabel("元のツイートを開く")
             }
         }
     }
 
-    private var metadata: some View {
-        HStack(spacing: 12) {
-            if let createdAt = tweet.createdAt {
-                Text(createdAt, format: .dateTime.year().month().day().hour().minute())
-            }
+    private var handleAndDate: String {
+        var parts = ["@\(tweet.authorScreenName)"]
+        if let createdAt = tweet.createdAt {
+            parts.append(createdAt.formatted(.dateTime.month().day()))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var metaRow: some View {
+        HStack(spacing: 14) {
             if let likeCount = tweet.likeCount {
-                Label("\(likeCount)", systemImage: "heart")
+                Label(likeCount.formatted(), systemImage: "heart")
             }
-            if tweet.media.isEmpty {
-                Text("メディアなし")
-            } else {
-                Label("\(tweet.media.count)", systemImage: tweet.hasVideo ? "film" : "photo")
+            if let first = tweet.media.first, let width = first.width, let height = first.height {
+                Text(first.kind.isVideo ? "\(width) × \(height) · 最高画質" : "\(width) × \(height) · 原寸")
+            } else if tweet.media.isEmpty {
+                Text("テキストのみ")
             }
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Theme.muted)
     }
 }
 
-/// 添付メディア 1 件のプレビュー。動画はその場で再生できる。
-struct MediaPreview: View {
+/// 添付メディア 1 件。動画はその場で再生、画像はそのまま表示。
+struct MediaView: View {
     let media: TweetMedia
+    var localURL: URL? = nil
+
     @State private var player: AVPlayer?
 
     private var aspectRatio: CGFloat {
@@ -88,31 +95,30 @@ struct MediaPreview: View {
                 VideoPlayer(player: player)
                     .onAppear {
                         // 再描画のたびに作り直すと再生位置が戻ってしまう。
-                        if player == nil { player = AVPlayer(url: media.url) }
+                        if player == nil { player = AVPlayer(url: localURL ?? media.url) }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        MediaBadge(systemImage: "film", text: media.kind == .animatedGIF ? "GIF" : "動画")
+                            .padding(12)
                     }
                     .overlay(alignment: .bottomTrailing) {
                         if let duration = media.formattedDuration {
-                            Text(duration)
-                                .font(.caption2.monospacedDigit())
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.black.opacity(0.6), in: Capsule())
-                                .foregroundStyle(.white)
-                                .padding(6)
+                            MediaBadge(text: duration).padding(12)
                         }
                     }
             } else {
-                AsyncImage(url: media.thumbnailURL ?? media.url) { image in
-                    image.resizable().scaledToFit()
+                AsyncImage(url: localURL ?? media.thumbnailURL ?? media.url) { image in
+                    image.resizable().scaledToFill()
                 } placeholder: {
                     ZStack {
-                        Rectangle().fill(.quaternary)
-                        ProgressView()
+                        Theme.mediaPlaceholder
+                        ProgressView().tint(Theme.accent)
                     }
                 }
             }
         }
         .aspectRatio(aspectRatio, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Theme.surfaceRaised)
+        .clipped()
     }
 }

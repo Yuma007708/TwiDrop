@@ -8,6 +8,8 @@ struct TwiDropApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
+                .fontDesign(.rounded)
+                .preferredColorScheme(.dark)
                 .task { viewModel.refreshSaved() }
                 .onOpenURL { url in
                     Task { await viewModel.handleIncoming(url: url) }
