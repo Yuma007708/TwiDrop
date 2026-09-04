@@ -196,7 +196,6 @@ struct SaveView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(!viewModel.canSubmit)
-                .opacity(viewModel.canSubmit ? 1 : 0.4)
 
                 if viewModel.previewedTweet != nil {
                     Label("動画と画像は写真アプリに入ります", systemImage: "photo")

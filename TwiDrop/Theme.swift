@@ -7,7 +7,7 @@ enum Theme {
     static let tint = Color(red: 0xE6 / 255, green: 0xE6 / 255, blue: 0xF2 / 255)
     static let tintStrong = Color(red: 0xC9 / 255, green: 0xC9 / 255, blue: 0xF0 / 255)
     static let text = Color(red: 0x1A / 255, green: 0x1A / 255, blue: 0x2E / 255)
-    static let muted = Color(red: 0x6E / 255, green: 0x6E / 255, blue: 0x8C / 255)
+    static let muted = Color(red: 0x63 / 255, green: 0x63 / 255, blue: 0x7F / 255)
     static let accent = Color(red: 0x2B / 255, green: 0x2E / 255, blue: 0xD9 / 255)
     static let onAccent = Color.white
     static let danger = Color(red: 0xD9 / 255, green: 0x2B / 255, blue: 0x4C / 255)
@@ -28,13 +28,19 @@ enum Theme {
 
 /// インディゴの主ボタン。1 画面に 1 つだけ置く。
 struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline.weight(.black))
-            .foregroundStyle(Theme.onAccent)
+            // 無効時は透明度ではなく専用の色にして、文字が読める状態を保つ。
+            .foregroundStyle(isEnabled ? Theme.onAccent : Theme.accent)
             .frame(maxWidth: .infinity, minHeight: 56)
-            .background(Theme.accent, in: Capsule())
-            .shadow(color: Theme.accent.opacity(configuration.isPressed ? 0.15 : 0.28), radius: 12, y: 8)
+            .background(isEnabled ? Theme.accent : Theme.tintStrong, in: Capsule())
+            .shadow(
+                color: Theme.accent.opacity(!isEnabled ? 0 : (configuration.isPressed ? 0.15 : 0.28)),
+                radius: 12, y: 8
+            )
             .opacity(configuration.isPressed ? 0.9 : 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
