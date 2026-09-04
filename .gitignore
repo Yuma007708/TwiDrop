@@ -1,19 +1,9 @@
-__pycache__/
-*.py[cod]
-.pytest_cache/
-*.egg-info/
-build/
-dist/
-.venv/
-venv/
-
-# 保存したツイート（既定の出力先）
-downloads/
-
 # Xcode / SwiftPM
-ios/*.xcodeproj/
-ios/*.xcworkspace/
+*.xcodeproj/
+*.xcworkspace/
 .build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+.swiftpm/
+.DS_Store

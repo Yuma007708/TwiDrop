@@ -2,9 +2,9 @@ import XCTest
 @testable import TwiDropKit
 
 final class SyndicationTokenTests: XCTestCase {
-    /// 同じアルゴリズムの Python 実装（`twidrop/syndication.py`）が出す値と一致すること。
-    /// どちらかを直したときにずれたら気付けるようにしている。
-    func testMatchesReferenceImplementation() {
+    /// 公式の埋め込みスクリプトと同じアルゴリズムを別実装で計算した参照値と一致すること。
+    /// 36 進変換や丸めを直したときにずれたら気付けるようにしている。
+    func testMatchesReferenceValues() {
         let expected = [
             "20": "6dq1a2xwd93",
             "111": "zeyp3r4jfxrc",
