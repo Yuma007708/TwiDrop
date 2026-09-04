@@ -1,57 +1,48 @@
 # TwiDrop
 
-ツイートの URL を渡すだけで、**本文・画像・動画**をローカルに保存するツールです。
-Web UI とコマンドラインの両方から使えます。
+ツイートの URL から**本文・画像・動画**を保存するアプリです。
+API キーや X アカウントのログインは不要です（埋め込みツイートが使う公開エンドポイントを利用）。
 
-- API キー不要（埋め込みツイートが使う公開エンドポイントを利用）
-- 動画は自動で**最高画質の mp4** を選択
-- 画像は原寸（`name=orig`）で保存
-- 本文は Markdown（`tweet.md`）と JSON（`tweet.json`）の両方で保存
+- 📱 **[iOS アプリ](ios/)** — SwiftUI 製。共有シートから保存、写真アプリへの書き出しに対応
+- 🖥 **CLI / Web UI** — 同じ処理を Python から使えるコンパニオン実装
 
-## セットアップ
+動画は自動で**最高画質の mp4** を、画像は**原寸**を選びます。
+
+## iOS アプリ
+
+```bash
+brew install xcodegen
+cd ios
+xcodegen generate
+open TwiDrop.xcodeproj
+```
+
+- URL を貼り付けて**プレビュー**（本文・作者・動画はその場で再生）
+- **端末に保存** — `tweet.json` / `tweet.md` と動画・画像のファイル
+- **写真アプリに追加** — 保存した動画・画像をカメラロールへ
+- **共有シートから保存** — X アプリで「共有 → TwiDrop に保存」
+- **保存済み一覧** — 詳細表示、共有シートで書き出し、スワイプで削除
+
+セットアップ手順と構成は **[ios/README.md](ios/README.md)** を参照してください。
+
+```bash
+swift test --package-path ios/TwiDropKit    # 45 tests
+```
+
+## CLI / Web UI（Python）
+
+Mac やサーバ上でまとめて保存したいときに使えます。
 
 ```bash
 pip install -r requirements.txt
-```
 
-## Web UI
-
-```bash
-python -m twidrop --serve
-# → http://127.0.0.1:8000
-```
-
-URL を貼り付けて「プレビュー」で内容を確認し、「保存する」でサーバ上に保存します。
-保存したファイルは画面上のリンクからブラウザにダウンロードできます。
-
-保存先を変えたいときは `--output` か環境変数 `TWIDROP_OUTPUT_DIR` を使います。
-
-```bash
-python -m twidrop --serve --port 9000 --output ~/tweets
-```
-
-## コマンドライン
-
-```bash
-# 本文・画像・動画をまとめて保存（既定の保存先は ./downloads）
+python -m twidrop --serve                   # Web UI → http://127.0.0.1:8000
 python -m twidrop https://x.com/NASA/status/1362551461910114310
-
-# 複数まとめて / 保存先を指定
-python -m twidrop -o ~/tweets URL1 URL2 URL3
-
-# 保存せず内容だけ確認
-python -m twidrop --info URL
-
-# 本文だけ保存（メディアは取得しない）
-python -m twidrop --no-media URL
-
-# 既存のメディアも再取得
-python -m twidrop --overwrite URL
+python -m twidrop --info URL                # 保存せず内容だけ表示
+python -m twidrop --no-media URL            # 本文だけ保存
 ```
 
-`pip install -e .` すると `twidrop` コマンドとしても実行できます。
-
-### 保存されるもの
+保存結果:
 
 ```
 downloads/
@@ -61,14 +52,16 @@ downloads/
     └── NASA_1362551461910114310_1.mp4  # 動画（最高画質）
 ```
 
-対応する URL の形式:
+`pip install -e .` すると `twidrop` コマンドとしても実行できます。
+
+### 対応する URL
 
 - `https://x.com/<user>/status/<id>`
 - `https://twitter.com/<user>/status/<id>`（`mobile.` / `www.` 付きも可）
 - `https://x.com/i/web/status/<id>`
 - ツイート ID だけ（例: `1362551461910114310`）
 
-## Python から使う
+### Python から使う
 
 ```python
 from twidrop import service
@@ -80,7 +73,7 @@ result = service.save_from_url("https://x.com/NASA/status/1362551461910114310")
 print(result.directory, [p.name for p in result.files])
 ```
 
-## JSON API
+### JSON API
 
 Web UI は次の API の上に載っているので、他のツールからも呼び出せます。
 
@@ -92,26 +85,25 @@ Web UI は次の API の上に載っているので、他のツールからも�
 | `GET` | `/files/<dir>/<file>` | 保存済みファイルのダウンロード |
 | `GET` | `/api/health` | 稼働確認 |
 
-## 構成
-
-| ファイル | 役割 |
-| --- | --- |
-| `twidrop/urls.py` | URL からツイート ID を取り出す |
-| `twidrop/syndication.py` | 公開エンドポイントから JSON を取得 |
-| `twidrop/parser.py` | JSON をツイート／メディアのモデルに変換 |
-| `twidrop/downloader.py` | 本文とメディアをディスクに保存 |
-| `twidrop/service.py` | URL → 取得 → 保存をつなぐ高レベル API |
-| `twidrop/server.py` | FastAPI の Web UI / JSON API |
-| `twidrop/cli.py` | コマンドライン |
-
-## テスト
-
 ```bash
 pip install -r requirements-dev.txt
-pytest
+pytest                                      # 66 tests
 ```
 
-ネットワークには接続せず、実際の API と同じ構造の合成データでテストします。
+## 構成
+
+どちらの実装も同じ流れです。UI から切り離したロジック層を持つので、単体でテストできます。
+
+| 処理 | Swift (`ios/TwiDropKit/`) | Python (`twidrop/`) |
+| --- | --- | --- |
+| URL からツイート ID を取り出す | `TweetURL.swift` | `urls.py` |
+| エンドポイント用の token を生成 | `SyndicationToken.swift` | `syndication.py` |
+| ツイート JSON を取得 | `SyndicationClient.swift` | `syndication.py` |
+| JSON をモデルへ変換 | `TweetParser.swift` | `parser.py` |
+| メディアを取得 | `MediaDownloader.swift` | `downloader.py` |
+| 保存・一覧・削除 | `TweetArchive.swift` | `downloader.py` |
+
+`SyndicationTokenTests` は、Swift と Python の token 生成結果が一致することも確認しています。
 
 ## 制限と注意
 

@@ -9,3 +9,11 @@ venv/
 
 # 保存したツイート（既定の出力先）
 downloads/
+
+# Xcode / SwiftPM
+ios/*.xcodeproj/
+ios/*.xcworkspace/
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
