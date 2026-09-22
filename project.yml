@@ -1,0 +1,72 @@
+# XcodeGen 用のプロジェクト定義。
+#   brew install xcodegen && cd ios && xcodegen generate && open TwiDrop.xcodeproj
+#
+# .xcodeproj を直接コミットするとマージが壊れやすいので、この定義から生成する。
+name: TwiDrop
+
+options:
+  bundleIdPrefix: dev.twidrop
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  TwiDropKit:
+    path: TwiDropKit
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    # 個人の開発チーム ID を入れるか、Xcode の Signing & Capabilities で選び直してください。
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2"
+
+targets:
+  TwiDrop:
+    type: application
+    platform: iOS
+    sources:
+      - path: TwiDrop
+    dependencies:
+      - package: TwiDropKit
+      - target: ShareExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.twidrop.app
+        PRODUCT_NAME: TwiDrop
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: TwiDrop/Info.plist
+        CODE_SIGN_ENTITLEMENTS: TwiDrop/TwiDrop.entitlements
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+  ShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+      # 保存先の決め方と配色を本体アプリと共有する。
+      - path: TwiDrop/ArchiveLocation.swift
+      - path: TwiDrop/Theme.swift
+      - path: TwiDrop/PhotoLibrarySaver.swift
+    dependencies:
+      - package: TwiDropKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.twidrop.app.ShareExtension
+        PRODUCT_NAME: ShareExtension
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: ShareExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: ShareExtension/ShareExtension.entitlements
+
+schemes:
+  TwiDrop:
+    build:
+      targets:
+        TwiDrop: all
+        ShareExtension: all
+    run:
+      config: Debug
+    test:
+      config: Debug
